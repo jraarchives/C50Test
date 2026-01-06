@@ -4,7 +4,7 @@ import pandas as pd
 import math
 
 # =====================================================
-# Tata letak
+# KONFIGURASI HALAMAN
 # =====================================================
 st.set_page_config(
     page_title="Penentuan Nilai Probit",
@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # =====================================================
-# Background
+# BACKGROUND & UI NATURE STYLE
 # =====================================================
 st.markdown("""
 <style>
@@ -136,7 +136,7 @@ if not st.session_state.login:
     u = st.text_input("Username")
     p = st.text_input("Password", type="password")
     if st.button("Login"):
-        if u == "admin" and p == "1234":
+        if u == "anafi" and p == "1234":
             st.session_state.login = True
             st.rerun()
         else:
@@ -162,7 +162,7 @@ if menu == "Home":
     st.markdown("""
     **Fitur sistem:**
     - Konversi mortalitas → probit (Finney)
-    - Nilai probit & penentuan LC₅₀
+    - Regresi nilai probit & penentuan LC₅₀
     - IC₅₀ / EC₅₀ berbasis regresi linier
     - Total Phenolic Content (TPC)
     """)
@@ -237,7 +237,7 @@ if menu == "TPC":
         xs.append(c1.number_input(f"Konsentrasi {i+1}"))
         ys.append(c2.number_input(f"Absorbansi {i+1}"))
 
-    if st.button("Persamaan Regresi"):
+    if st.button("Buat Kurva"):
         a,b = regresi_linier(xs,ys)
         st.session_state.a = a
         st.session_state.b = b
