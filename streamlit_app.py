@@ -28,7 +28,7 @@ st.markdown("""
     background: rgba(255,255,255,0.88);
     padding: 2.5rem;
     border-radius: 20px;
-    box-shadow: 0 10px 28px rgba(0,0,0,0.08);
+    box-shadow: 0 10 28px rgba(0,0,0,0.08);
 }
 
 .logo {
@@ -195,11 +195,20 @@ if menu == "LC50 Probit":
 
         a,b = regresi_linier(logk, prob)
         r,r2 = korelasi(logk, prob)
+
         lc50 = 10 ** ((5 - b)/a)
 
         st.success(f"LC₅₀ = {lc50:.4f}")
         st.info(f"Probit = {a:.4f} logC + {b:.4f}")
         st.info(f"r = {r:.4f} | R² = {r2:.4f}")
+
+        st.session_state.riwayat.append({
+            "Jenis":"LC50",
+            "LC50":lc50,
+            "Slope":a,
+            "Intercept":b,
+            "r":r
+        })
 
 # =====================================================
 # IC50 / EC50
@@ -224,6 +233,68 @@ if menu == "IC50 / EC50":
         st.info(f"r = {r:.4f} | R² = {r2:.4f}")
         st.info(f"Kategori: {klasifikasi_ic50(ic50)}")
 
+import altair as alt
+
+# =====================================================
+# KURVA REGRESI — LC50 PROBIT
+# =====================================================
+if menu == "LC50 Probit" and st.session_state.get("login", False):
+
+    if st.button("Tampilkan Kurva LC50 Probit"):
+        if len(kons) > 1:
+
+            persen = [(mati[i]/total[i])*100 for i in range(int(n))]
+            logk = [math.log10(k) for k in kons]
+            prob = [mortalitas_ke_probit(p) for p in persen]
+
+            a,b = regresi_linier(logk, prob)
+
+            df_plot = pd.DataFrame({
+                "Log Konsentrasi": logk,
+                "Probit": prob
+            })
+
+            line = alt.Chart(df_plot).mark_line().encode(
+                x="Log Konsentrasi",
+                y="Probit"
+            )
+
+            scatter = alt.Chart(df_plot).mark_point(size=80).encode(
+                x="Log Konsentrasi",
+                y="Probit"
+            )
+
+            st.subheader("Kurva Regresi Probit")
+            st.altair_chart(line + scatter, use_container_width=True)
+
+# =====================================================
+# KURVA REGRESI — IC50 / EC50
+# =====================================================
+if menu == "IC50 / EC50" and st.session_state.get("login", False):
+
+    if st.button("Tampilkan Kurva IC50 / EC50"):
+        if len(x) > 1:
+
+            a,b = regresi_linier(x,y)
+
+            df_plot = pd.DataFrame({
+                "Konsentrasi": x,
+                "Efek": y
+            })
+
+            line = alt.Chart(df_plot).mark_line().encode(
+                x="Konsentrasi",
+                y="Efek"
+            )
+
+            scatter = alt.Chart(df_plot).mark_point(size=80).encode(
+                x="Konsentrasi",
+                y="Efek"
+            )
+
+            st.subheader("Kurva Regresi IC50 / EC50")
+            st.altair_chart(line + scatter, use_container_width=True)
+
 # =====================================================
 # TPC
 # =====================================================
@@ -237,7 +308,7 @@ if menu == "TPC":
         xs.append(c1.number_input(f"Konsentrasi {i+1}"))
         ys.append(c2.number_input(f"Absorbansi {i+1}"))
 
-    if st.button("Buat Kurva"):
+    if st.button("Persamaan Regresi"):
         a,b = regresi_linier(xs,ys)
         st.session_state.a = a
         st.session_state.b = b
@@ -245,14 +316,40 @@ if menu == "TPC":
 
     if "a" in st.session_state:
         abs_s = st.number_input("Absorbansi sampel")
-        vol = st.number_input("Volume (mL)",1.0)
-        fp = st.number_input("Faktor pengenceran",1.0)
-        m = st.number_input("Massa (g)",1.0)
+        vol = st.number_input("Volume (mL)")
+        fp = st.number_input("Faktor pengenceran")
+        m = st.number_input("Massa (g)")
 
         if st.button("Hitung TPC"):
             c = ((abs_s-st.session_state.b)/st.session_state.a)/1000
             tpc = (c*vol*fp)/m
             st.success(f"TPC = {tpc:.4f} mg GAE/g")
+
+# =====================================================
+# KURVA REGRESI — TPC
+# =====================================================
+if menu == "TPC" and st.session_state.get("login", False):
+
+    if st.button("Tampilkan Kurva Standar TPC"):
+        if len(xs) > 1:
+
+            df_plot = pd.DataFrame({
+                "Konsentrasi": xs,
+                "Absorbansi": ys
+            })
+
+            line = alt.Chart(df_plot).mark_line().encode(
+                x="Konsentrasi",
+                y="Absorbansi"
+            )
+
+            scatter = alt.Chart(df_plot).mark_point(size=80).encode(
+                x="Konsentrasi",
+                y="Absorbansi"
+            )
+
+            st.subheader("Kurva Standar TPC")
+            st.altair_chart(line + scatter, use_container_width=True)
 
 # =====================================================
 # RIWAYAT & LOGOUT
