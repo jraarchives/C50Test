@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import math
+import altair as alt   # 🔥 WAJIB
 
 # =====================================================
 # KONFIGURASI HALAMAN
@@ -12,7 +13,7 @@ st.set_page_config(
 )
 
 # =====================================================
-# BACKGROUND & UI STYLE
+# BACKGROUND & UI
 # =====================================================
 st.markdown("""
 <style>
@@ -21,11 +22,18 @@ st.markdown("""
         rgba(210,240,220,0.55),
         rgba(200,230,255,0.55)
     );
+    background-attachment: fixed;
 }
 .block-container {
     background: rgba(255,255,255,0.88);
     padding: 2.5rem;
     border-radius: 20px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.08);
+    color: #1f2937; /* 🔥 INI KUNCI */
+}
+label, .stNumberInput label, .stTextInput label {
+    color: #1f2937 !important;
+    font-weight: 500;
 }
 .logo {
     font-size: 72px;
@@ -41,6 +49,11 @@ st.markdown("""
     text-align: center;
     color: #4f6f68;
 }
+.stButton > button {
+    background: linear-gradient(90deg,#4CAF50,#66BB6A);
+    color: white;
+    border-radius: 10px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -53,7 +66,7 @@ if "riwayat" not in st.session_state:
     st.session_state.riwayat = []
 
 # =====================================================
-# TABEL PROBIT FINNEY
+# PROBIT TABLE (FINNEY)
 # =====================================================
 PROBIT_TABLE = {
     1:{0:2.67,1:2.95,2:3.12,3:3.25,4:3.36,5:3.45,6:3.52,7:3.58,8:3.59,9:3.66},
@@ -76,8 +89,6 @@ def mortalitas_ke_probit(p):
     if p <= 0: p = 1
     if p >= 100: p = 99
     p = int(round(p))
-    if p >= 99:
-        return PROBIT_TABLE[99][9]
     puluhan = int(p//10*10)
     satuan = int(p%10)
     if puluhan == 0:
@@ -116,8 +127,9 @@ if not st.session_state.login:
 
     u = st.text_input("Username")
     p = st.text_input("Password", type="password")
+
     if st.button("Login"):
-        if u == "admin" and p == "1234":
+        if u == "anafi" and p == "1234":
             st.session_state.login = True
             st.rerun()
         else:
@@ -125,12 +137,20 @@ if not st.session_state.login:
     st.stop()
 
 # =====================================================
-# SIDEBAR
+# MENU
 # =====================================================
 menu = st.sidebar.radio(
     "Menu",
     ["Home","LC50 Probit","IC50 / EC50","TPC","Riwayat","Logout"]
 )
+
+# =====================================================
+# HOME
+# =====================================================
+if menu == "Home":
+    st.markdown('<div class="logo">🌱🔬</div>', unsafe_allow_html=True)
+    st.markdown('<div class="app-title">Silakan Olah Data Anda</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitle">LC₅₀ • IC₅₀ • EC₅₀ • TPC</div>', unsafe_allow_html=True)
 
 # =====================================================
 # LC50 PROBIT
@@ -151,51 +171,74 @@ if menu == "LC50 Probit":
         logk = [math.log10(k) for k in kons]
         prob = [mortalitas_ke_probit(p) for p in persen]
 
-        a,b = regresi_linier(logk, prob)
-        r,r2 = korelasi(logk, prob)
-        lc50 = 10 ** ((5 - b)/a)
-
-        st.success(f"LC50 = {lc50:.4f}")
-
-        st.session_state.riwayat.append({
-            "Jenis": "LC50 Probit",
-            "Hasil": round(lc50,4),
-            "Persamaan": f"Probit = {a:.4f} logC + {b:.4f}",
-            "R2": round(r2,4)
+        df = pd.DataFrame({
+            "Log Konsentrasi": logk,
+            "Probit": prob
         })
+        st.line_chart(df.set_index("Log Konsentrasi"))
+
+        a,b = regresi_linier(logk, prob)
+        lc50 = 10 ** ((5 - b)/a)
+        st.success(f"LC₅₀ = {lc50:.4f}")
 
 # =====================================================
-# IC50
+# IC50 / EC50 + GRAFIK + REGRESI
 # =====================================================
 if menu == "IC50 / EC50":
-    st.header("IC50 / EC50")
+    st.header("IC₅₀ / EC₅₀")
     n = st.number_input("Jumlah titik", min_value=3, value=5)
 
-    x,y = [],[]
+    x, y = [], []
     for i in range(int(n)):
-        c1,c2 = st.columns(2)
+        c1, c2 = st.columns(2)
         x.append(c1.number_input(f"Konsentrasi {i+1}"))
-        y.append(c2.number_input(f"% Efek {i+1}",0.0,100.0))
+        y.append(c2.number_input(f"% Efek {i+1}", 0.0, 100.0))
 
     if st.button("Hitung IC50 / EC50"):
-        a,b = regresi_linier(x,y)
-        r,r2 = korelasi(x,y)
-        ic50 = (50-b)/a
+        # =========================
+        # REGRESI & KORELASI
+        # =========================
+        a, b = regresi_linier(x, y)
+        r, r2 = korelasi(x, y)
+        ic50 = (50 - b) / a
 
-        st.success(f"IC50 = {ic50:.4f}")
+        # =========================
+        # DATA GRAFIK
+        # =========================
+        df = pd.DataFrame({
+            "Konsentrasi": x,
+            "% Efek": y
+        }).sort_values("Konsentrasi")
 
-        st.session_state.riwayat.append({
-            "Jenis": "IC50 / EC50",
-            "Hasil": round(ic50,4),
-            "Kategori": klasifikasi_ic50(ic50),
-            "R2": round(r2,4)
+        x_reg = np.linspace(min(x), max(x), 100)
+        y_reg = a * x_reg + b
+
+        df_reg = pd.DataFrame({
+            "Konsentrasi": x_reg,
+            "Regresi": y_reg
         })
+
+        # =========================
+        # GRAFIK
+        # =========================
+        st.subheader("Grafik IC₅₀ / EC₅₀")
+        st.line_chart(df.set_index("Konsentrasi"))
+        st.line_chart(df_reg.set_index("Konsentrasi"))
+
+        # =========================
+        # OUTPUT NUMERIK 
+        # =========================
+        st.success(f"IC₅₀ / EC₅₀ = {ic50:.4f}")
+        st.info(f"Persamaan regresi: y = {a:.4f}x + {b:.4f}")
+        st.info(f"Koefisien korelasi (r) = {r:.4f}")
+        st.info(f"Koefisien determinasi (R²) = {r2:.4f}")
+        st.info(f"Kategori aktivitas: {klasifikasi_ic50(ic50)}")
 
 # =====================================================
 # TPC
 # =====================================================
 if menu == "TPC":
-    st.header("TPC")
+    st.header("Total Phenolic Content (TPC)")
     n = st.number_input("Jumlah standar", min_value=3, value=5)
 
     xs,ys = [],[]
@@ -204,44 +247,59 @@ if menu == "TPC":
         xs.append(c1.number_input(f"Konsentrasi {i+1}"))
         ys.append(c2.number_input(f"Absorbansi {i+1}"))
 
-    if st.button("Buat Kurva"):
+    if st.button("Persamaan Regresi"):
         a,b = regresi_linier(xs,ys)
         st.session_state.a = a
         st.session_state.b = b
+        st.success(f"A = {a:.4f}C + {b:.4f}")
 
     if "a" in st.session_state:
         abs_s = st.number_input("Absorbansi sampel")
-        vol = st.number_input("Volume (mL)",1.0)
-        fp = st.number_input("Faktor pengenceran",1.0)
-        m = st.number_input("Massa (g)",1.0)
+        vol = st.number_input("Volume (mL)")
+        fp = st.number_input("Faktor pengenceran")
+        m = st.number_input("Massa (g)")
 
         if st.button("Hitung TPC"):
             c = ((abs_s-st.session_state.b)/st.session_state.a)/1000
             tpc = (c*vol*fp)/m
-
             st.success(f"TPC = {tpc:.4f} mg GAE/g")
 
-            st.session_state.riwayat.append({
-                "Jenis": "TPC",
-                "Hasil": round(tpc,4),
-                "Massa (g)": m
+# =====================================================
+# KURVA REGRESI — TPC
+# =====================================================
+if menu == "TPC" and st.session_state.get("login", False):
+
+    if st.button("Tampilkan Kurva Standar TPC"):
+        if len(xs) > 1:
+
+            df_plot = pd.DataFrame({
+                "Konsentrasi": xs,
+                "Absorbansi": ys
             })
 
+            line = alt.Chart(df_plot).mark_line().encode(
+                x="Konsentrasi",
+                y="Absorbansi"
+            )
+
+            scatter = alt.Chart(df_plot).mark_point(size=80).encode(
+                x="Konsentrasi",
+                y="Absorbansi"
+            )
+
+            st.subheader("Kurva Standar TPC")
+            st.altair_chart(line + scatter, use_container_width=True)
+            
+
 # =====================================================
-# RIWAYAT
+# RIWAYAT & LOGOUT
 # =====================================================
 if menu == "Riwayat":
     if st.session_state.riwayat:
         st.table(pd.DataFrame(st.session_state.riwayat))
-        if st.button("Hapus Riwayat"):
-            st.session_state.riwayat = []
-            st.success("Riwayat dihapus")
     else:
         st.info("Belum ada data")
 
-# =====================================================
-# LOGOUT
-# =====================================================
 if menu == "Logout":
     st.session_state.clear()
     st.success("Logout berhasil")
