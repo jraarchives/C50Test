@@ -136,7 +136,7 @@ if not st.session_state.login:
     u = st.text_input("Username")
     p = st.text_input("Password", type="password")
     if st.button("Login"):
-        if u == "anafi" and p == "1234":
+        if u == "admin" and p == "1234":
             st.session_state.login = True
             st.rerun()
         else:
@@ -162,7 +162,7 @@ if menu == "Home":
     st.markdown("""
     **Fitur sistem:**
     - Konversi mortalitas → probit (Finney)
-    - Regresi nilai probit & penentuan LC₅₀
+    - Nilai probit & penentuan LC₅₀
     - IC₅₀ / EC₅₀ berbasis regresi linier
     - Total Phenolic Content (TPC)
     """)
