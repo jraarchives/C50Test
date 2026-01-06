@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # =====================================================
-# BACKGROUND & UI NATURE STYLE
+# BACKGROUND & UI STYLE
 # =====================================================
 st.markdown("""
 <style>
@@ -21,44 +21,25 @@ st.markdown("""
         rgba(210,240,220,0.55),
         rgba(200,230,255,0.55)
     );
-    background-attachment: fixed;
 }
-
 .block-container {
     background: rgba(255,255,255,0.88);
     padding: 2.5rem;
     border-radius: 20px;
-    box-shadow: 0 10px 28px rgba(0,0,0,0.08);
 }
-
 .logo {
     font-size: 72px;
     text-align: center;
-    transition: transform 0.4s ease;
 }
-.logo:hover {
-    transform: scale(1.15) rotate(3deg);
-}
-
 .app-title {
     text-align: center;
     font-size: 36px;
     font-weight: 700;
     color: #2f5d50;
 }
-
 .subtitle {
     text-align: center;
     color: #4f6f68;
-    margin-bottom: 2rem;
-}
-
-.stButton > button {
-    background: linear-gradient(90deg,#4CAF50,#66BB6A);
-    color: white;
-    border-radius: 10px;
-    padding: 0.6rem 1.4rem;
-    border: none;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -136,7 +117,7 @@ if not st.session_state.login:
     u = st.text_input("Username")
     p = st.text_input("Password", type="password")
     if st.button("Login"):
-        if u == "admin" and p == "1234":
+        if u == "anafi" and p == "1234":
             st.session_state.login = True
             st.rerun()
         else:
@@ -144,28 +125,12 @@ if not st.session_state.login:
     st.stop()
 
 # =====================================================
-# SIDEBAR MENU
+# SIDEBAR
 # =====================================================
 menu = st.sidebar.radio(
     "Menu",
     ["Home","LC50 Probit","IC50 / EC50","TPC","Riwayat","Logout"]
 )
-
-# =====================================================
-# HOME
-# =====================================================
-if menu == "Home":
-    st.markdown('<div class="logo">🌱🔬</div>', unsafe_allow_html=True)
-    st.markdown('<div class="app-title">Silakan Olah Data Anda</div>', unsafe_allow_html=True)
-    st.markdown('<div class="subtitle">LC₅₀ • IC₅₀ • EC₅₀ • TPC</div>', unsafe_allow_html=True)
-
-    st.markdown("""
-    **Fitur sistem:**
-    - Konversi mortalitas → probit (Finney)
-    - Regresi nilai probit & penentuan LC₅₀
-    - IC₅₀ / EC₅₀ berbasis regresi linier
-    - Total Phenolic Content (TPC)
-    """)
 
 # =====================================================
 # LC50 PROBIT
@@ -186,26 +151,24 @@ if menu == "LC50 Probit":
         logk = [math.log10(k) for k in kons]
         prob = [mortalitas_ke_probit(p) for p in persen]
 
-        df = pd.DataFrame({
-            "Log Konsentrasi": logk,
-            "% Mortalitas": persen,
-            "Probit": prob
-        })
-        st.table(df.round(4))
-
         a,b = regresi_linier(logk, prob)
         r,r2 = korelasi(logk, prob)
         lc50 = 10 ** ((5 - b)/a)
 
-        st.success(f"LC₅₀ = {lc50:.4f}")
-        st.info(f"Probit = {a:.4f} logC + {b:.4f}")
-        st.info(f"r = {r:.4f} | R² = {r2:.4f}")
+        st.success(f"LC50 = {lc50:.4f}")
+
+        st.session_state.riwayat.append({
+            "Jenis": "LC50 Probit",
+            "Hasil": round(lc50,4),
+            "Persamaan": f"Probit = {a:.4f} logC + {b:.4f}",
+            "R2": round(r2,4)
+        })
 
 # =====================================================
-# IC50 / EC50
+# IC50
 # =====================================================
 if menu == "IC50 / EC50":
-    st.header("IC₅₀ / EC₅₀")
+    st.header("IC50 / EC50")
     n = st.number_input("Jumlah titik", min_value=3, value=5)
 
     x,y = [],[]
@@ -219,16 +182,20 @@ if menu == "IC50 / EC50":
         r,r2 = korelasi(x,y)
         ic50 = (50-b)/a
 
-        st.success(f"IC₅₀ / EC₅₀ = {ic50:.4f}")
-        st.info(f"y = {a:.4f}x + {b:.4f}")
-        st.info(f"r = {r:.4f} | R² = {r2:.4f}")
-        st.info(f"Kategori: {klasifikasi_ic50(ic50)}")
+        st.success(f"IC50 = {ic50:.4f}")
+
+        st.session_state.riwayat.append({
+            "Jenis": "IC50 / EC50",
+            "Hasil": round(ic50,4),
+            "Kategori": klasifikasi_ic50(ic50),
+            "R2": round(r2,4)
+        })
 
 # =====================================================
 # TPC
 # =====================================================
 if menu == "TPC":
-    st.header("Total Phenolic Content (TPC)")
+    st.header("TPC")
     n = st.number_input("Jumlah standar", min_value=3, value=5)
 
     xs,ys = [],[]
@@ -241,7 +208,6 @@ if menu == "TPC":
         a,b = regresi_linier(xs,ys)
         st.session_state.a = a
         st.session_state.b = b
-        st.success(f"A = {a:.4f}C + {b:.4f}")
 
     if "a" in st.session_state:
         abs_s = st.number_input("Absorbansi sampel")
@@ -252,17 +218,30 @@ if menu == "TPC":
         if st.button("Hitung TPC"):
             c = ((abs_s-st.session_state.b)/st.session_state.a)/1000
             tpc = (c*vol*fp)/m
+
             st.success(f"TPC = {tpc:.4f} mg GAE/g")
 
+            st.session_state.riwayat.append({
+                "Jenis": "TPC",
+                "Hasil": round(tpc,4),
+                "Massa (g)": m
+            })
+
 # =====================================================
-# RIWAYAT & LOGOUT
+# RIWAYAT
 # =====================================================
 if menu == "Riwayat":
     if st.session_state.riwayat:
         st.table(pd.DataFrame(st.session_state.riwayat))
+        if st.button("Hapus Riwayat"):
+            st.session_state.riwayat = []
+            st.success("Riwayat dihapus")
     else:
         st.info("Belum ada data")
 
+# =====================================================
+# LOGOUT
+# =====================================================
 if menu == "Logout":
     st.session_state.clear()
     st.success("Logout berhasil")
